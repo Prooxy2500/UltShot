@@ -14,7 +14,12 @@
 // Sets default values
 AShooterCharacter::AShooterCharacter() :
 	BaseTurnRate(45.f),
-	BaseLookUpRate(45.f)
+	BaseLookUpRate(45.f),
+	bAiming(false),
+	CameraDefaultFOV(0.f),  // will be set at BeginPlay
+	CameraZoomedFOV(35.f),
+	CameraCurrentFOV(0.f),
+	ZoomInterpSpeed(20.f)
 {
  	// Set this character to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
@@ -22,9 +27,9 @@ AShooterCharacter::AShooterCharacter() :
 	// Create a camera boom (pulls in towards the character if there is a collision
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
 	CameraBoom->SetupAttachment(RootComponent);
-	CameraBoom->TargetArmLength = 300.f; // The camera follows at this distance behind the character
+	CameraBoom->TargetArmLength = 180.f; // The camera follows at this distance behind the character
 	CameraBoom->bUsePawnControlRotation = true; // Rotate the arm based on the controller
-	CameraBoom->SocketOffset = FVector(0.f, 50.f, 50.f);
+	CameraBoom->SocketOffset = FVector(0.f, 50.f, 70.f);
 
 
 	// Create a follow camera
@@ -48,31 +53,12 @@ AShooterCharacter::AShooterCharacter() :
 void AShooterCharacter::BeginPlay()
 {
 	Super::BeginPlay();
-
-	//UE_LOG(LogTemp, Warning, TEXT("BeginPlay() called!"));
-
-	//int myInt{ 42 };
-	//UE_LOG(LogTemp, Warning, TEXT("int myInt: %d"), myInt);
-
-	//float myFloat{ 3.12159f };
-	//UE_LOG(LogTemp, Warning, TEXT("float myFloat: %f"), myFloat);
-
-	//double myDouble{ 0.000756 };
-	//UE_LOG(LogTemp, Warning, TEXT("double myDouble: %lf"), myDouble);
-	//
-	//char myChar{ 'J' };
-	//UE_LOG(LogTemp, Warning, TEXT("char myChar: %c"), myChar);
-	//
-	//wchar_t wideChar{ L'J' };
-	//UE_LOG(LogTemp, Warning, TEXT("wchar_t wideChar: %lc"), wideChar);
-
-	//bool myBool{ true };
-	//UE_LOG(LogTemp, Warning, TEXT("bool myBool: %d"), wideChar);
-
-	//FString myString{ TEXT("My String!!!!!") };
-	//UE_LOG(LogTemp, Warning, TEXT("FString myString : %s"), *myString);
-	//
-	//UE_LOG(LogTemp, Warning, TEXT("Name of intstance: %s"), *GetName());
+	
+	if (FollowCamera)
+	{
+		CameraDefaultFOV = GetFollowCamera()->FieldOfView;
+		CameraCurrentFOV = CameraDefaultFOV;
+	}
 }
 
 void AShooterCharacter::MoveForward(float Value)
@@ -206,10 +192,39 @@ bool AShooterCharacter::GetBeamEndLocation(const FVector& MuzzleSocketLocation, 
 	return false;
 }
 
+void AShooterCharacter::AimingButtonPressed()
+{
+	bAiming = true;
+}
+
+void AShooterCharacter::AimingButtonReleased()
+{
+	bAiming = false;
+}
+
+void AShooterCharacter::CameraInterpZoom(float DeltaTime)
+{
+	// Setting the current camera field of view
+	if (bAiming)
+	{
+		// Interp to zoom
+		CameraCurrentFOV = FMath::FInterpTo(CameraCurrentFOV, CameraZoomedFOV, DeltaTime, ZoomInterpSpeed);
+	}
+	else
+	{
+		// Interp to default 
+		CameraCurrentFOV = FMath::FInterpTo(CameraCurrentFOV, CameraDefaultFOV, DeltaTime, ZoomInterpSpeed);
+	}
+	GetFollowCamera()->SetFieldOfView(CameraCurrentFOV);
+}
+
 // Called every frame
 void AShooterCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+
+	// Handle interpolation for zoom when aiming
+	CameraInterpZoom(DeltaTime);
 }
 
 // Called to bind functionality to input
@@ -229,5 +244,8 @@ void AShooterCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCo
 	PlayerInputComponent->BindAction("Jump", IE_Released, this, &ACharacter::StopJumping);
 	
 	PlayerInputComponent->BindAction("FireButton", IE_Pressed, this, &AShooterCharacter::FireWeapon);
+
+	PlayerInputComponent->BindAction("AimingButton", IE_Pressed, this, &AShooterCharacter::AimingButtonPressed);
+	PlayerInputComponent->BindAction("AimingButton", IE_Released, this, &AShooterCharacter::AimingButtonReleased);
 }
 
