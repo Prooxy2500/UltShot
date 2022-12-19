@@ -42,4 +42,7 @@ private:
 	/* Last Offset yaw used for stopping */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Movement, meta = (ALlowPrivateAccess = "true"))
 	float LastMovementOffsetYaw;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Movement, meta = (AllowPrivateAccess = "true"))
+	bool bAiming;
 };
